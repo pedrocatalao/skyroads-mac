@@ -49,6 +49,7 @@ void sys_err(int code);
 
 /* ---- file I/O (handle-based, data dir aware) ---- */
 void  set_data_dir(const char *dir);
+const char *sky_data_dir(void);
 int   xopenr(const char *name);        /* handle or 0; SysErr on fail */
 int   xcreate(const char *name, int attr);
 void  xclose(int h);

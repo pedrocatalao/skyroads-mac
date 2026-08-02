@@ -18,5 +18,12 @@ if ! find "$DEST" -maxdepth 1 -iname "roads.lzs" | grep -q .; then
     echo "ERROR: download did not contain the expected game data" >&2
     exit 1
 fi
+# TimGM6mb SoundFont (GPL, Tim Brechbill / MuseScore) for the wavetable
+# music mode; the game falls back to AdLib FM without it.
+SF_URL="https://sourceforge.net/p/mscore/code/HEAD/tree/trunk/mscore/share/sound/TimGM6mb.sf2?format=raw"
+if [ ! -f "$DEST/TimGM6mb.sf2" ]; then
+    echo "Downloading TimGM6mb.sf2 (wavetable instruments, ~6 MB) ..."
+    curl -fL --progress-bar -o "$DEST/TimGM6mb.sf2" "$SF_URL" || echo "warning: soundfont fetch failed; music will use AdLib FM"
+fi
 echo "OK: game data in ./$DEST ($(ls "$DEST" | wc -l | tr -d ' ') files)"
 echo "Next: ./native/make_app.sh $DEST"

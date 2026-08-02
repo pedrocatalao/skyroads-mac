@@ -10,6 +10,11 @@
 #include "opl3.h"
 #include <SDL.h>
 #include <string.h>
+#include <stdio.h>
+
+#define TSF_IMPLEMENTATION
+#include "tsf.h"
+#include "gm_map.h"
 
 #define ADLTICK_HZ   180.02
 #define SAMPLE_RATE  44100
@@ -47,6 +52,21 @@ static duint Playing_Song = (duint)-1;
 static uint8_t musbuf[16000];
 static SDL_mutex *lock;
 
+/* ---- wavetable ("AWE32") backend: TinySoundFont over the same events ---- */
+static tsf *wt;                       /* NULL if no soundfont found */
+static int  wt_on;                    /* F9 toggles when wt is available */
+static int  wt_note[11];              /* sounding MIDI note per channel, -1 none */
+static float wt_vel[11];              /* velocity from VOL_CHANGE, 0..1 */
+/* percussion channels 6..10 -> GM drum notes (kick/snare/tom/cymbal/hat) */
+static const uint8_t wt_drum[5] = { 36, 38, 47, 49, 42 };
+
+static int gm_program(int ins) {
+    const uint8_t *p = Ins_Ptr + ins * 16;
+    for (unsigned i = 0; i < sizeof GmMap / sizeof *GmMap; i++)
+        if (!memcmp(GmMap[i].patch, p, 11)) return GmMap[i].gm;
+    return 80;                        /* unknown patch: square lead */
+}
+
 /* PCM sfx channel (sbdma) */
 static const uint8_t *pcm_buf;
 static uint32_t pcm_len, pcm_pos_fx;   /* pos in 16.16 */
@@ -55,6 +75,10 @@ static uint32_t pcm_step;
 static void adlout(uint8_t reg, uint8_t val) { OPL3_WriteRegBuffered(&chip, reg, val); }
 
 static void noteoff(int ch) {                       /* adlib.asm:249 */
+    if (wt && wt_note[ch] >= 0) {
+        tsf_channel_note_off(wt, ch < MELOCHN ? ch : 9, wt_note[ch]);
+        wt_note[ch] = -1;
+    }
     if (ch < MELOCHN) { adlout(0xb0 + ch, 0); return; }
     PercKey &= (uint8_t)((0xef >> (ch - MELOCHN)) | (0xef << (8 - (ch - MELOCHN))));
     adlout(0xbd, PercKey);
@@ -87,6 +111,16 @@ static void chprog_raw(int ch, const uint8_t *si) { /* init's perc setup */
 
 static void noteon(int ch, int note) {              /* adlib.asm:196 */
     noteoff(ch);
+    if (wt && wt_on) {
+        if (ch < MELOCHN) {
+            tsf_channel_set_presetnumber(wt, ch, gm_program(ChnIns[ch]), 0);
+            wt_note[ch] = note + 24;              /* song note 0 = C1 */
+            tsf_channel_note_on(wt, ch, wt_note[ch], wt_vel[ch]);
+        } else {
+            wt_note[ch] = wt_drum[ch - MELOCHN];
+            tsf_channel_note_on(wt, 9, wt_note[ch], wt_vel[ch]);
+        }
+    }
     int slot = chnchn[ch];
     if (ch < MELOCHN + 1) {                         /* melodic + bass drum */
         int oct = note / 12 + 2, n = note % 12;
@@ -102,6 +136,7 @@ static void noteon(int ch, int note) {              /* adlib.asm:196 */
 static void volume(int ch, int vol) {               /* adlib.asm:265-301 */
     const uint8_t *si = Ins_Ptr + ChnIns[ch] * 16;
     if (vol > 30) vol = 30;
+    wt_vel[ch] = (float)(63 - chgvol[vol]) / 63.0f;
     int two_op = chnop[ch + 11] != 0xff;
     /* op2 (carrier) always when present */
     if (two_op) {
@@ -118,6 +153,8 @@ static void volume(int ch, int vol) {               /* adlib.asm:265-301 */
 }
 
 static void adl_stop_locked(void) {                 /* adlib.asm:101 */
+    if (wt) tsf_note_off_all(wt);
+    for (int i = 0; i < 11; i++) { wt_note[i] = -1; wt_vel[i] = 0.85f; }
     Song_Ptr = Loop_Ptr = empty_song;
     PercKey = 0xe0;
     for (int r = 0x40; r <= 0x55; r++) adlout((uint8_t)r, 0x3f);
@@ -162,29 +199,60 @@ static void audio_cb(void *ud, Uint8 *stream, int len) {
     int16_t *out = (int16_t *)stream;
     int frames = len / 4;                           /* stereo s16 */
     SDL_LockMutex(lock);
-    for (int i = 0; i < frames; i++) {
+    int use_wt = wt && wt_on;
+    for (int i = 0; i < frames; ) {
         tick_accum += ADLTICK_HZ / SAMPLE_RATE;
         if (tick_accum >= 1.0) { tick_accum -= 1.0; adltick(); }
-        int16_t sm[2];
-        OPL3_GenerateResampled(&chip, sm);
-        int l = sm[0] * 2, r = sm[1] * 2;           /* modest gain */
-        if (pcm_buf) {                              /* mix 8-bit unsigned PCM */
-            uint32_t p = pcm_pos_fx >> 16;
-            if (p >= pcm_len) pcm_buf = NULL;
-            else {
-                int s = ((int)pcm_buf[p] - 128) << 7;
-                l += s; r += s;
-                pcm_pos_fx += pcm_step;
-            }
+        int n = (int)((1.0 - tick_accum) / (ADLTICK_HZ / SAMPLE_RATE)) + 1;
+        if (n > frames - i) n = frames - i;
+        if (n < 1) n = 1;
+        if (use_wt) {
+            tsf_render_short(wt, out + i * 2, n, 0);
+            tick_accum += (n - 1) * (ADLTICK_HZ / SAMPLE_RATE);
+        } else {
+            n = 1;
+            int16_t sm[2];
+            OPL3_GenerateResampled(&chip, sm);
+            out[i * 2]     = (int16_t)(sm[0] * 2 > 32767 ? 32767 : sm[0] * 2);
+            out[i * 2 + 1] = (int16_t)(sm[1] * 2 > 32767 ? 32767 : sm[1] * 2);
         }
+        i += n;
+    }
+    /* overlay the PCM sfx channel */
+    for (int i = 0; i < frames && pcm_buf; i++) {
+        uint32_t p = pcm_pos_fx >> 16;
+        if (p >= pcm_len) { pcm_buf = NULL; break; }
+        int s = ((int)pcm_buf[p] - 128) << 7;
+        pcm_pos_fx += pcm_step;
+        int l = out[i * 2] + s, r = out[i * 2 + 1] + s;
         out[i * 2]     = (int16_t)(l > 32767 ? 32767 : l < -32768 ? -32768 : l);
         out[i * 2 + 1] = (int16_t)(r > 32767 ? 32767 : r < -32768 ? -32768 : r);
     }
     SDL_UnlockMutex(lock);
 }
 
+static void wt_toggle(void) {
+    SDL_LockMutex(lock);
+    if (wt) {
+        wt_on = !wt_on;
+        tsf_note_off_all(wt);
+        for (int i = 0; i < 11; i++) wt_note[i] = -1;
+    }
+    SDL_UnlockMutex(lock);
+}
+
 void audio_init(void) {
     lock = SDL_CreateMutex();
+    char sf[1200];
+    snprintf(sf, sizeof sf, "%s/TimGM6mb.sf2", sky_data_dir());
+    wt = tsf_load_filename(sf);
+    if (wt) {
+        tsf_set_output(wt, TSF_STEREO_INTERLEAVED, SAMPLE_RATE, -3.0f);
+        tsf_channel_set_bank_preset(wt, 9, 128, 0);   /* GM drums */
+        wt_on = 1;                                    /* AWE32 mode default */
+        plat_f9_hook = wt_toggle;
+    }
+    for (int i = 0; i < 11; i++) { wt_note[i] = -1; wt_vel[i] = 0.85f; }
     OPL3_Reset(&chip, SAMPLE_RATE);
     adl_init_locked();
     SDL_AudioSpec want = {0}, have;

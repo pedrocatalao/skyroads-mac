@@ -49,6 +49,7 @@ cmake --build native/build --target skyroads
 | Space | jump |
 | Enter | select (menus) |
 | Esc | abort road / back |
+| F9 | music: wavetable ("AWE32") / AdLib FM |
 | F10 | CRT effects on/off (scanlines, phosphor trails, smooth scaling) |
 | Cmd-F / F11 | fullscreen |
 
@@ -87,3 +88,7 @@ cmake --build native/build --target skyroads
   freeware.
 - OPL2 FM synthesis via [Nuked-OPL3](https://github.com/nukeykt/Nuked-OPL3)
   (Nuke.YKT), LGPL-2.1 — see `native/src/opl3.c` for its license header.
+- Wavetable music mode via [TinySoundFont](https://github.com/schellingb/TinySoundFont)
+  (MIT) playing the [TimGM6mb](https://musescore.org) SoundFont (GPL,
+  Tim Brechbill), fetched by `get_data.sh` — the instrument mapping was
+  reconstructed from the original Sound Club song sources.

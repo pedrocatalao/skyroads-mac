@@ -27,6 +27,7 @@ void     plat_sleep(int ms);
 extern volatile duint Time;
 void plat_tick_update(void);       /* call once per frame to advance Time */
 
+extern void (*plat_f9_hook)(void);
 double plat_now(void);             /* seconds, monotonic */
 const char *plat_pref_path(void);  /* ~/Library/Application Support/SkyRoads/ */
 const char *plat_base_path(void);  /* bundle Resources dir (or NULL) */

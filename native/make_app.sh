@@ -66,10 +66,16 @@ for f in trekdat.lzs roads.lzs muzax.lzs cars.lzs dashbrd.lzs \
          world5.lzs world6.lzs world7.lzs world8.lzs world9.lzs; do
     copy_data "$f" required
 done
-# not used by the port yet (intro sequence / demo mode)
+# not used by the port yet (demo mode)
 for f in anim.lzs intro.snd demo.rec; do
     copy_data "$f" optional
 done
+# wavetable soundfont: data dir, then native/ fallback
+if ! find "$DATA_DIR" -maxdepth 1 -iname "TimGM6mb.sf2" | grep -q .; then
+    [ -f "$(dirname "$0")/TimGM6mb.sf2" ] && cp "$(dirname "$0")/TimGM6mb.sf2" "$OUT/Contents/Resources/"
+else
+    copy_data "TimGM6mb.sf2" optional
+fi
 
 # app icon: native/icon.png if provided, else generated from the ship sprite
 ICON_SRC=""

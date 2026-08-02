@@ -16,6 +16,7 @@ static SDL_Texture *fx_target, *fx_scan;
 static uint8_t      fx_acc[VGA_W * VGA_H][3];   /* phosphor accumulator */
 #define FX_PERSIST 178                          /* trail decay, /256 per frame */
 
+void (*plat_f9_hook)(void);
 volatile duint Time = 0;
 static double tick_origin;
 
@@ -149,6 +150,10 @@ static void key_event(SDL_Keycode k, int down) {
     }
     if (down && k == SDLK_F10 && fx_target) {   /* CRT effects on/off */
         fx_on = !fx_on;
+        return;
+    }
+    if (down && k == SDLK_F9 && plat_f9_hook) {  /* music mode toggle */
+        plat_f9_hook();
         return;
     }
     unsigned bit = 0;

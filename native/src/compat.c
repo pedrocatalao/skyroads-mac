@@ -42,6 +42,8 @@ void xfree(duint seg) {
 static FILE *files[MAX_FILES];
 static char  data_dir[1024] = ".";
 
+const char *sky_data_dir(void) { return data_dir; }
+
 void set_data_dir(const char *dir) {
     snprintf(data_dir, sizeof data_dir, "%s", dir);
 }
