@@ -1,9 +1,18 @@
 #!/bin/bash
 # make_app.sh — package the native SkyRoads port as a macOS .app bundle.
 set -euo pipefail
-cd "$(dirname "$0")"
 
-DATA_DIR="${1:-..}"          # original game data location
+# Resolve the data dir relative to where the user runs the script,
+# BEFORE changing directory.
+DATA_ARG="${1:-$(dirname "$0")/..}"
+if [ ! -d "$DATA_ARG" ]; then
+    echo "ERROR: data directory '$DATA_ARG' not found" >&2
+    echo "Usage: $0 <path-to-skyroads-game-data>   (e.g. ./native/make_app.sh data)" >&2
+    exit 1
+fi
+DATA_DIR="$(cd "$DATA_ARG" && pwd)"
+
+cd "$(dirname "$0")"
 OUT="build/SkyRoads.app"
 
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release >/dev/null
