@@ -10,6 +10,11 @@ on Apple Silicon. No emulation, no DOSBox.
 
 ![status](https://img.shields.io/badge/status-playable-brightgreen)
 
+<p align="center">
+  <img src="native/screenshots/gameplay.png" width="49%" alt="In-game: the ship on road one">
+  <img src="native/screenshots/title-crt.png" width="49%" alt="Title screen with CRT effects (F10)">
+</p>
+
 ## Download & play
 
 **[⬇ Download SkyRoads for macOS (Apple Silicon)](https://github.com/pedrocatalao/skyroads-mac/releases/download/1.0/SkyRoads.zip)**

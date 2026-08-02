@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
     uint8_t *pg = seg_ptr(page);
     memcpy(pg + 138 * 320, seg_ptr(Background_Seg) + 138 * 320, 62 * 320);
 
-    const uint8_t *car = seg_ptr(Cars_Seg);      /* frame 0, column-major */
+    const uint8_t *car = seg_ptr(Cars_Seg) + 44 * 720;   /* ship, level pose */
     int x = 160 + 50 - 14;                        /* trek1.c:235 */
 
     for (int i = 0; i < 5; i++) {
