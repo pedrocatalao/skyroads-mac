@@ -1,0 +1,249 @@
+/* audio.c — SkyRoads audio: adlib.asm event-stream player on Nuked-OPL3
+ * (OPL2 subset) + SoundBlaster PCM sfx, mixed in the SDL audio callback.
+ *
+ * Song stream (adlib.asm:19-29): u16 words, low byte = cmd(bits 0-2) |
+ * channel<<4, high byte = argument.  adltick executes commands until a
+ * DELAY, at 180 Hz (miscasm.asm timint, PIT divisor 0x19e4).
+ */
+#include "assets.h"
+#include "platform.h"
+#include "opl3.h"
+#include <SDL.h>
+#include <string.h>
+
+#define ADLTICK_HZ   180.02
+#define SAMPLE_RATE  44100
+#define MELOCHN      6
+
+/* ---- tables from adlib.asm:35-58 ---- */
+static const uint8_t basereg[11] = { 0x20,0x40,0x60,0x80,0xe0, 0x20,0x40,0x60,0x80,0xe0, 0xc0 };
+static const uint8_t chnop[22] = {
+    0x00,0x01,0x02,0x08,0x09,0x0a,0x10,0x14,0x12,0x15,0x11,       /* op1 */
+    0x03,0x04,0x05,0x0b,0x0c,0x0d,0x13,0xff,0xff,0xff,0xff        /* op2 */
+};
+static const uint8_t chnchn[11] = { 0,1,2,3,4,5,6,7,0xff,8,0xff };
+static const uint8_t chgvol[31] = {
+    63,20,16,14,12,10,9,8,7,6, 6,5,5,4,4,4,4,4,3,3, 3,3,2,2,2,1,1,1,1,0, 0
+};
+static const uint8_t lofreq[12] = { 0xac,0xb6,0xc1,0xcd,0xd9,0xe6,0xf3,0x02,0x11,0x22,0x33,0x45 };
+static const uint8_t hifreq[12] = { 0,0,0,0,0,0,0,1,1,1,1,1 };
+
+/* built-in percussion instruments (adlib.asm:62-65), 11 bytes each */
+static const uint8_t perc_ins[4][11] = {
+    { 0x0C,0x00,0xF8,0xB5,0x00, 0x00,0x00,0xD6,0x4F,0x00, 0x01 },  /* snare1  */
+    { 0x04,0x00,0xF7,0xB5,0x00, 0x00,0x00,0xD6,0x4F,0x00, 0x01 },  /* tom1    */
+    { 0x01,0x00,0xF5,0xB5,0x00, 0x00,0x00,0xD6,0x4F,0x00, 0x01 },  /* cymbal1 */
+    { 0x01,0x00,0xF7,0xB5,0x00, 0x4E,0x00,0x10,0x00,0x00, 0x01 },  /* hihat1  */
+};
+static const uint8_t empty_song[6] = { 6,0, 0,0xff, 5,0 };  /* loopb, delay 255, end */
+
+/* ---- player state ---- */
+static opl3_chip chip;
+static const uint8_t *Ins_Ptr;
+static const uint8_t *Song_Ptr, *Loop_Ptr;
+static uint8_t PercKey, Delay, ChnIns[11];
+uint8_t Adl_Event;
+static duint Playing_Song = (duint)-1;
+static uint8_t musbuf[16000];
+static SDL_mutex *lock;
+
+/* PCM sfx channel (sbdma) */
+static const uint8_t *pcm_buf;
+static uint32_t pcm_len, pcm_pos_fx;   /* pos in 16.16 */
+static uint32_t pcm_step;
+
+static void adlout(uint8_t reg, uint8_t val) { OPL3_WriteRegBuffered(&chip, reg, val); }
+
+static void noteoff(int ch) {                       /* adlib.asm:249 */
+    if (ch < MELOCHN) { adlout(0xb0 + ch, 0); return; }
+    PercKey &= (uint8_t)((0xef >> (ch - MELOCHN)) | (0xef << (8 - (ch - MELOCHN))));
+    adlout(0xbd, PercKey);
+}
+
+static void chprog(int ch, int ins) {               /* adlib.asm:156 */
+    noteoff(ch);
+    const uint8_t *si = Ins_Ptr + ins * 16;
+    ChnIns[ch] = (uint8_t)ins;
+    for (int b = 0; b < 5; b++)
+        adlout(chnop[ch] + basereg[b], si[b]);
+    if (chnop[ch + 11] != 0xff)
+        for (int b = 5; b < 10; b++)
+            adlout(chnop[ch + 11] + basereg[b], si[b]);
+    if (chnchn[ch] != 0xff)
+        adlout(chnchn[ch] + basereg[10], si[10]);
+}
+
+static void chprog_raw(int ch, const uint8_t *si) { /* init's perc setup */
+    noteoff(ch);
+    ChnIns[ch] = 0;
+    for (int b = 0; b < 5; b++)
+        adlout(chnop[ch] + basereg[b], si[b]);
+    if (chnop[ch + 11] != 0xff)
+        for (int b = 5; b < 10; b++)
+            adlout(chnop[ch + 11] + basereg[b], si[b]);
+    if (chnchn[ch] != 0xff)
+        adlout(chnchn[ch] + basereg[10], si[10]);
+}
+
+static void noteon(int ch, int note) {              /* adlib.asm:196 */
+    noteoff(ch);
+    int slot = chnchn[ch];
+    if (ch < MELOCHN + 1) {                         /* melodic + bass drum */
+        int oct = note / 12 + 2, n = note % 12;
+        adlout(0xa0 + slot, lofreq[n]);
+        uint8_t hi = (uint8_t)(hifreq[n] | (oct << 2));
+        if (slot < MELOCHN) { adlout(0xb0 + slot, hi | 0x20); return; }
+        adlout(0xb0 + slot, hi);                    /* bass drum: no key-on bit */
+    }
+    PercKey |= (uint8_t)(0x10 >> (ch - MELOCHN));
+    adlout(0xbd, PercKey);
+}
+
+static void volume(int ch, int vol) {               /* adlib.asm:265-301 */
+    const uint8_t *si = Ins_Ptr + ChnIns[ch] * 16;
+    if (vol > 30) vol = 30;
+    int two_op = chnop[ch + 11] != 0xff;
+    /* op2 (carrier) always when present */
+    if (two_op) {
+        uint8_t lvl = si[5 + 1];
+        uint8_t out = (uint8_t)((lvl & 0x3f) + chgvol[vol]);
+        if (out > 0x3f) out = 0x3f;
+        adlout(chnop[ch + 11] + 0x40, (uint8_t)((lvl & 0xc0) | out));
+        if (!(si[10] & 1)) return;                  /* FM: modulator untouched */
+    }
+    uint8_t lvl = si[1];
+    uint8_t out = (uint8_t)((lvl & 0x3f) + chgvol[vol]);
+    if (out > 0x3f) out = 0x3f;
+    adlout(chnop[ch] + 0x40, (uint8_t)((lvl & 0xc0) | out));
+}
+
+static void adl_stop_locked(void) {                 /* adlib.asm:101 */
+    Song_Ptr = Loop_Ptr = empty_song;
+    PercKey = 0xe0;
+    for (int r = 0x40; r <= 0x55; r++) adlout((uint8_t)r, 0x3f);
+    for (int ch = MELOCHN + 1; ch >= 0; ch--) noteoff(ch);
+}
+
+static void adl_init_locked(void) {                 /* adlib.asm:121 */
+    adl_stop_locked();
+    adlout(0x01, 0x20);                             /* waveform select enable */
+    adlout(0x08, 0x00);
+    adlout(0xbd, 0xe0);                             /* percussion mode on */
+    for (int ch = MELOCHN + 1, k = 0; k < 4; ch++, k++)
+        chprog_raw(ch, perc_ins[k]);
+    adlout(0xa8, 0xac); adlout(0xb8, 0x0c);         /* SD/TT fixed freqs */
+    adlout(0xa7, 0x02); adlout(0xb7, 0x0d);
+}
+
+static void adltick(void) {                         /* adlib.asm:320 */
+    for (;;) {
+        if (Delay) { Delay--; return; }
+        uint8_t lo = Song_Ptr[0], hi = Song_Ptr[1];
+        Song_Ptr += 2;
+        int cmd = lo & 7, ch = lo >> 4;
+        switch (cmd) {
+        case 0: Delay = hi; break;
+        case 1: chprog(ch, hi); break;
+        case 2: noteon(ch, hi & 0x7f); break;
+        case 3: noteoff(ch); break;
+        case 4: volume(ch, hi); break;
+        case 5: Song_Ptr = Loop_Ptr; break;
+        case 6: Loop_Ptr = Song_Ptr; break;
+        case 7: Adl_Event = hi; break;
+        }
+    }
+}
+
+/* ---- SDL mixing ---- */
+static double tick_accum;
+
+static void audio_cb(void *ud, Uint8 *stream, int len) {
+    (void)ud;
+    int16_t *out = (int16_t *)stream;
+    int frames = len / 4;                           /* stereo s16 */
+    SDL_LockMutex(lock);
+    for (int i = 0; i < frames; i++) {
+        tick_accum += ADLTICK_HZ / SAMPLE_RATE;
+        if (tick_accum >= 1.0) { tick_accum -= 1.0; adltick(); }
+        int16_t sm[2];
+        OPL3_GenerateResampled(&chip, sm);
+        int l = sm[0] * 2, r = sm[1] * 2;           /* modest gain */
+        if (pcm_buf) {                              /* mix 8-bit unsigned PCM */
+            uint32_t p = pcm_pos_fx >> 16;
+            if (p >= pcm_len) pcm_buf = NULL;
+            else {
+                int s = ((int)pcm_buf[p] - 128) << 7;
+                l += s; r += s;
+                pcm_pos_fx += pcm_step;
+            }
+        }
+        out[i * 2]     = (int16_t)(l > 32767 ? 32767 : l < -32768 ? -32768 : l);
+        out[i * 2 + 1] = (int16_t)(r > 32767 ? 32767 : r < -32768 ? -32768 : r);
+    }
+    SDL_UnlockMutex(lock);
+}
+
+void audio_init(void) {
+    lock = SDL_CreateMutex();
+    OPL3_Reset(&chip, SAMPLE_RATE);
+    adl_init_locked();
+    SDL_AudioSpec want = {0}, have;
+    want.freq = SAMPLE_RATE;
+    want.format = AUDIO_S16SYS;
+    want.channels = 2;
+    want.samples = 512;
+    want.callback = audio_cb;
+    SDL_AudioDeviceID dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+    if (dev) SDL_PauseAudioDevice(dev, 0);
+}
+
+/* sbdma(buf,len,smprate): SB time constant tc -> rate = 1000000/(256-tc) */
+void sbdma(const uint8_t *buf, uint32_t len, duint smprate) {
+    SDL_LockMutex(lock);
+    uint32_t rate = smprate > 255 ? smprate : 1000000u / (256u - smprate);
+    pcm_buf = buf;
+    pcm_len = len;
+    pcm_pos_fx = 0;
+    pcm_step = (uint32_t)((uint64_t)rate * 65536 / SAMPLE_RATE);
+    SDL_UnlockMutex(lock);
+}
+
+void sbstop(void) { SDL_LockMutex(lock); pcm_buf = NULL; SDL_UnlockMutex(lock); }
+
+/* ---- play_song (intro.c:996) — real implementation ---- */
+void play_song(duint songnr) {
+    struct { duint offset, instruments, songlen; } hdr;
+    if (Playing_Song == songnr) return;
+    SDL_LockMutex(lock);
+    adl_stop_locked();
+    SDL_UnlockMutex(lock);
+    if (cfg.silence) return;
+    int h = xopenr("muzax.lzs");
+    if (SysErr) { SysErr = 0; return; }
+    xseek(h, songnr * (long)sizeof hdr, 0);
+    xread(h, &hdr, sizeof hdr);
+    xseek(h, hdr.offset, 0);
+    init_bit_i(h, 0, 4096, 0);
+    if (hdr.songlen < sizeof musbuf) {
+        extr_lzss(musbuf, hdr.songlen);
+        if (!SysErr) {
+            SDL_LockMutex(lock);
+            adl_init_locked();
+            Ins_Ptr = musbuf;
+            Song_Ptr = Loop_Ptr = musbuf + hdr.instruments * 16;
+            Adl_Event = 0;
+            Delay = 0;
+            Playing_Song = songnr;
+            SDL_UnlockMutex(lock);
+        }
+    }
+    xclose(h);
+    SysErr = 0;
+}
+
+void stop_song(void) {
+    SDL_LockMutex(lock);
+    adl_stop_locked();
+    Playing_Song = (duint)-1;
+    SDL_UnlockMutex(lock);
+}

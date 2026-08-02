@@ -1,0 +1,10 @@
+# Only the native port is published. The original Bluemoon source tree and
+# game data live alongside locally but are never committed.
+/*
+!/native/
+!/.gitignore
+!/README.md
+native/build/
+.DS_Store
+*.ppm
+native/tools/unlzs
