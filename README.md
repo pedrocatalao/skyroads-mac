@@ -69,7 +69,7 @@ cmake --build native/build --target skyroads
 | Esc | abort road / back |
 | F9 | music: wavetable ("AWE32") / AdLib FM |
 | F10 | CRT effects on/off (scanlines, phosphor trails, smooth scaling) |
-| Cmd-F / F11 | fullscreen |
+| Cmd-F | fullscreen |
 
 ## What's in this repo
 
