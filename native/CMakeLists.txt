@@ -25,9 +25,8 @@ target_include_directories(trek_test PRIVATE src)
 add_executable(game_sim src/compat.c src/render.c src/game_play.c src/game_sim.c)
 target_include_directories(game_sim PRIVATE src)
 
-add_executable(cars_dump src/compat.c src/assets_headless.c src/cars_dump.c)
-target_include_directories(cars_dump PRIVATE src)
-
 add_executable(export_art src/compat.c src/assets_headless.c tools/export_art.c)
 target_include_directories(export_art PRIVATE src)
 target_link_libraries(export_art PRIVATE z)
+add_executable(songs_dump src/compat.c src/assets_headless.c tools/songs_dump.c)
+target_include_directories(songs_dump PRIVATE src)
