@@ -173,16 +173,16 @@ duint intro(void) {
     if (!Esc) sbdma(seg_ptr(Sample_Seg), SMP_LEN, 90);   /* "SkyRoads!" */
     wait_ticks_esc(64 - 18 - 9);
 
-    if (!Esc) {                         /* ship animation */
+    if (!Esc) {                         /* ship animation, 18.2 fps groups */
         duint t0 = Time;
-        for (i = 0; i < (int)pics; i++) {
-            if (ani[i].frame != lframe) {
-                while ((duint)(Time - t0) < FRAME_TIME) clear_keybuf();
-                t0 = Time;
-                lframe = ani[i].frame;
-            }
-            draw_picture(&ani[i].pic);
-            clear_keybuf();
+        (void)lframe;
+        for (i = 0; i < (int)pics; ) {
+            duint fr = ani[i].frame;    /* draw the whole frame atomically */
+            for (; i < (int)pics && ani[i].frame == fr; i++)
+                draw_picture(&ani[i].pic);
+            do clear_keybuf();          /* present + hold until next frame */
+            while ((duint)(Time - t0) < FRAME_TIME && !Esc);
+            t0 = Time;
             if (Esc) { draw_picture(&bkgrpic); break; }
         }
     }
