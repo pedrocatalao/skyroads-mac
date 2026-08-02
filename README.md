@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="native/icon.png" width="180" alt="SkyRoads app icon">
+</p>
+
 # SkyRoads for macOS (Apple Silicon)
 
 A native macOS port of **SkyRoads** (Bluemoon Interactive, 1993) — the classic
@@ -6,7 +10,15 @@ on Apple Silicon. No emulation, no DOSBox.
 
 ![status](https://img.shields.io/badge/status-playable-brightgreen)
 
-## Quick start
+## Download & play
+
+**[⬇ Download SkyRoads for macOS (Apple Silicon)](https://github.com/pedrocatalao/skyroads-mac/releases/download/1.0/SkyRoads.zip)**
+
+Unzip, move `SkyRoads.app` anywhere you like, and **right-click → Open** the
+first time (the app isn't notarized, so macOS asks once). That's it — the app
+is self-contained.
+
+## Build from source
 
 ```bash
 brew install cmake sdl2
