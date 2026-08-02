@@ -235,6 +235,7 @@ static void wt_toggle(void) {
     SDL_LockMutex(lock);
     if (wt) {
         wt_on = !wt_on;
+        plat_osd(wt_on ? "MUSIC AWE32" : "MUSIC ADLIB");
         tsf_note_off_all(wt);
         for (int i = 0; i < 11; i++) wt_note[i] = -1;
     }

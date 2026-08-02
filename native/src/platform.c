@@ -1,5 +1,6 @@
 #include "platform.h"
 #include <SDL.h>
+#include "font8.h"
 
 static SDL_Window   *win;
 static SDL_Renderer *ren;
@@ -74,6 +75,30 @@ void plat_tick_update(void) {
     Time = (duint)((plat_now() - tick_origin) * TICK_HZ);
 }
 
+
+static char   osd_msg[32];
+static double osd_until;
+
+void plat_osd(const char *msg) {
+    SDL_strlcpy(osd_msg, msg, sizeof osd_msg);
+    osd_until = plat_now() + 1.5;
+}
+
+static void osd_draw(void) {
+    if (plat_now() >= osd_until) return;
+    int tx = 8, ty = 8;
+    for (const char *p = osd_msg; *p; p++, tx += 8) {
+        const uint8_t *g = font8_glyph(*p);
+        if (!g) continue;
+        for (int r = 0; r < 8; r++)
+            for (int c = 0; c < 8; c++)
+                if (g[r] & (0x80 >> c)) {
+                    rgba[(ty + r + 1) * VGA_W + tx + c + 1] = 0xff000000u;
+                    rgba[(ty + r) * VGA_W + tx + c] = 0xff40e0ffu;   /* amber */
+                }
+    }
+}
+
 void plat_present(void) {
     const uint8_t *src = vga_mem();
     for (int i = 0; i < VGA_W * VGA_H; i++) {
@@ -96,6 +121,7 @@ void plat_present(void) {
         }
         rgba[i] = 0xff000000u | (b << 16) | (g << 8) | r;
     }
+    osd_draw();
     SDL_UpdateTexture(tex, NULL, rgba, VGA_W * 4);
     if (fx_on && fx_target) {
         SDL_SetRenderTarget(ren, fx_target);
@@ -150,6 +176,7 @@ static void key_event(SDL_Keycode k, int down) {
     }
     if (down && k == SDLK_F10 && fx_target) {   /* CRT effects on/off */
         fx_on = !fx_on;
+        plat_osd(fx_on ? "CRT ON" : "CRT OFF");
         return;
     }
     if (down && k == SDLK_F9 && plat_f9_hook) {  /* music mode toggle */
