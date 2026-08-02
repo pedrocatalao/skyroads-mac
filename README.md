@@ -49,6 +49,8 @@ cmake --build native/build --target skyroads
 | Space | jump |
 | Enter | select (menus) |
 | Esc | abort road / back |
+| F10 | CRT effects on/off (scanlines, phosphor trails, smooth scaling) |
+| Cmd-F / F11 | fullscreen |
 
 ## What's in this repo
 

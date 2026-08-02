@@ -8,6 +8,14 @@ static uint32_t      rgba[VGA_W * VGA_H];
 static unsigned      keymask;
 static int           lastch;
 
+/* CRT effects: F10 toggles.  4x render target for sharp-bilinear scaling
+ * ("antialias"), scanline overlay, phosphor-persistence motion blur. */
+#define FX_SCALE 4
+static int          fx_on = 1;
+static SDL_Texture *fx_target, *fx_scan;
+static uint8_t      fx_acc[VGA_W * VGA_H][3];   /* phosphor accumulator */
+#define FX_PERSIST 178                          /* trail decay, /256 per frame */
+
 volatile duint Time = 0;
 static double tick_origin;
 
@@ -31,6 +39,25 @@ int plat_init(const char *title, int scale) {
     SDL_RenderSetLogicalSize(ren, VGA_W * 4, VGA_H * 4 * 6 / 5);
     tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ABGR8888,
                             SDL_TEXTUREACCESS_STREAMING, VGA_W, VGA_H);
+    SDL_SetTextureScaleMode(tex, SDL_ScaleModeNearest);
+
+    fx_target = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ABGR8888,
+                                  SDL_TEXTUREACCESS_TARGET,
+                                  VGA_W * FX_SCALE, VGA_H * FX_SCALE);
+    if (fx_target) {
+        SDL_SetTextureScaleMode(fx_target, SDL_ScaleModeLinear);
+        /* scanline overlay: FX_SCALE rows per game line, last two darkened */
+        fx_scan = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ABGR8888,
+                                    SDL_TEXTUREACCESS_STATIC,
+                                    1, VGA_H * FX_SCALE);
+        static uint32_t scan[VGA_H * FX_SCALE];
+        for (int y = 0; y < VGA_H * FX_SCALE; y++) {
+            static const uint8_t a[FX_SCALE] = { 0, 0, 40, 96 };
+            scan[y] = (uint32_t)a[y % FX_SCALE] << 24;   /* black, alpha only */
+        }
+        SDL_UpdateTexture(fx_scan, NULL, scan, 4);
+        SDL_SetTextureBlendMode(fx_scan, SDL_BLENDMODE_BLEND);
+    } else fx_on = 0;                       /* no render-target support */
     tick_origin = plat_now();
     return 0;
 }
@@ -54,11 +81,55 @@ void plat_present(void) {
         uint32_t r = (c[0] << 2) | (c[0] >> 4);
         uint32_t g = (c[1] << 2) | (c[1] >> 4);
         uint32_t b = (c[2] << 2) | (c[2] >> 4);
+        if (fx_on) {
+            /* phosphor persistence: bright pixels decay instead of vanishing */
+            uint8_t *a = fx_acc[i];
+            uint32_t dr = (uint32_t)a[0] * FX_PERSIST >> 8;
+            uint32_t dg = (uint32_t)a[1] * FX_PERSIST >> 8;
+            uint32_t db = (uint32_t)a[2] * FX_PERSIST >> 8;
+            if (r > dr) dr = r;
+            if (g > dg) dg = g;
+            if (b > db) db = b;
+            a[0] = (uint8_t)dr; a[1] = (uint8_t)dg; a[2] = (uint8_t)db;
+            r = dr; g = dg; b = db;
+        }
         rgba[i] = 0xff000000u | (b << 16) | (g << 8) | r;
     }
     SDL_UpdateTexture(tex, NULL, rgba, VGA_W * 4);
-    SDL_RenderClear(ren);
-    SDL_RenderCopy(ren, tex, NULL, NULL);
+    if (fx_on && fx_target) {
+        SDL_SetRenderTarget(ren, fx_target);
+        SDL_RenderCopy(ren, tex, NULL, NULL);       /* nearest 4x: crisp pixels */
+        SDL_RenderCopy(ren, fx_scan, NULL, NULL);   /* scanlines */
+        SDL_SetRenderTarget(ren, NULL);
+        SDL_RenderClear(ren);
+        SDL_RenderCopy(ren, fx_target, NULL, NULL); /* linear: antialiased edge */
+    } else {
+        SDL_RenderClear(ren);
+        SDL_RenderCopy(ren, tex, NULL, NULL);
+    }
+    /* SKYROADS_DUMP_FX=<dir>: capture the post-effects backbuffer ~1/s */
+    const char *fxdir = SDL_getenv("SKYROADS_DUMP_FX");
+    if (fxdir) {
+        static int frame, last;
+        int now = (int)SDL_GetTicks() / 1000;
+        if (now != last) {
+            last = now;
+            int w, h;
+            SDL_GetRendererOutputSize(ren, &w, &h);
+            uint8_t *px = SDL_malloc((size_t)w * h * 4);
+            if (px && !SDL_RenderReadPixels(ren, NULL, SDL_PIXELFORMAT_ABGR8888, px, w * 4)) {
+                char path[1100];
+                SDL_snprintf(path, sizeof path, "%s/fx_%03d.ppm", fxdir, frame++);
+                FILE *f = fopen(path, "wb");
+                if (f) {
+                    fprintf(f, "P6\n%d %d\n255\n", w, h);
+                    for (int i = 0; i < w * h; i++) fwrite(px + i * 4, 1, 3, f);
+                    fclose(f);
+                }
+            }
+            SDL_free(px);
+        }
+    }
     SDL_RenderPresent(ren);
     void plat_debug_dump(const uint8_t *fb, const uint8_t (*pal)[3]);
     plat_debug_dump(src, (const uint8_t (*)[3])g_palette);
@@ -74,6 +145,10 @@ static void key_event(SDL_Keycode k, int down) {
     if (down && (k == SDLK_F11 ||
                  (k == SDLK_f && (SDL_GetModState() & KMOD_GUI)))) {
         toggle_fullscreen();
+        return;
+    }
+    if (down && k == SDLK_F10 && fx_target) {   /* CRT effects on/off */
+        fx_on = !fx_on;
         return;
     }
     unsigned bit = 0;
