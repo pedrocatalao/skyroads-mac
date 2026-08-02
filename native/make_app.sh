@@ -33,6 +33,7 @@ cat > "$OUT/Contents/Info.plist" <<'PLIST'
     <key>CFBundleDisplayName</key>     <string>SkyRoads</string>
     <key>CFBundlePackageType</key>     <string>APPL</string>
     <key>CFBundleShortVersionString</key> <string>1.0</string>
+    <key>CFBundleIconFile</key>        <string>SkyRoads</string>
     <key>NSHighResolutionCapable</key> <true/>
 </dict>
 </plist>
@@ -69,6 +70,19 @@ done
 for f in anim.lzs intro.snd demo.rec; do
     copy_data "$f" optional
 done
+
+# app icon: native/icon.png if provided, else generated from the ship sprite
+ICON_SRC=""
+[ -f icon.png ] && ICON_SRC=icon.png
+if ! cmake --build build --target cars_dump >/dev/null 2>&1; then true; fi
+if [ -n "$ICON_SRC" ]; then
+    python3 make_icon.py "$ICON_SRC" "$OUT/Contents/Resources/SkyRoads.icns" \
+        && echo "icon: from $ICON_SRC" || echo "note: icon generation failed, skipping"
+elif [ -x build/cars_dump ]; then
+    build/cars_dump "$DATA_DIR" build/ship_rgba.bin \
+        && python3 make_icon.py build/ship_rgba.bin "$OUT/Contents/Resources/SkyRoads.icns" \
+        && echo "icon: generated from ship sprite" || echo "note: icon generation failed, skipping"
+fi
 
 codesign --force -s - "$OUT"
 echo "built: $OUT"

@@ -37,9 +37,12 @@ int main(int argc, char **argv) {
     check_error();
     initvid();
 
-    intro();                            /* Esc skips; demo mode dropped */
+    /* Esc during the intro leaves the logo screen up and the menu draws
+     * over it (draw=0); a completed intro faded to black (draw=1). */
+    duint menu_draw = intro() ? 0 : 1;
 mm:
-    main_menu(1);
+    main_menu(menu_draw);
+    menu_draw = 1;
     start_alloc();
     load_game_data();
     for (;;) {

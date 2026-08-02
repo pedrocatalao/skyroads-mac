@@ -233,11 +233,14 @@ duint intro(void) {
 
     i = (int)(duint)Esc;
     Break = Esc = 0;
-    if (!i) {
+    if (!i) {                           /* completed: fade to black.  On Esc
+                                         * the screen keeps the logo as-is and
+                                         * main_menu(draw=0) draws over it,
+                                         * exactly like the original. */
         copy_to_pal(menu_palette, &bkgrpal);
         copy_to_pal(menu_palette, &flashpal2);
+        fade(menu_palette, 0, FADE_TIME);
     }
-    fade(menu_palette, 0, FADE_TIME);
     free_memory();
     return (duint)i;
 }
