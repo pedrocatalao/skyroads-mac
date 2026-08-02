@@ -79,7 +79,7 @@ if [ -n "$ICON_SRC" ]; then
     python3 make_icon.py "$ICON_SRC" "$OUT/Contents/Resources/SkyRoads.icns" \
         && echo "icon: from $ICON_SRC" || echo "note: icon generation failed, skipping"
 elif [ -x build/cars_dump ]; then
-    build/cars_dump "$DATA_DIR" build/ship_rgba.bin \
+    build/cars_dump "$DATA_DIR" build/ship_rgba.bin 44 \
         && python3 make_icon.py build/ship_rgba.bin "$OUT/Contents/Resources/SkyRoads.icns" \
         && echo "icon: generated from ship sprite" || echo "note: icon generation failed, skipping"
 fi
