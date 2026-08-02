@@ -249,7 +249,7 @@ void audio_init(void) {
     if (wt) {
         tsf_set_output(wt, TSF_STEREO_INTERLEAVED, SAMPLE_RATE, -3.0f);
         tsf_channel_set_bank_preset(wt, 9, 128, 0);   /* GM drums */
-        wt_on = 1;                                    /* AWE32 mode default */
+        wt_on = 0;                    /* default: authentic AdLib FM; F9 for AWE32 */
         plat_f9_hook = wt_toggle;
     }
     for (int i = 0; i < 11; i++) { wt_note[i] = -1; wt_vel[i] = 0.85f; }

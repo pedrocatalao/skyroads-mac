@@ -11,7 +11,7 @@ static int           lastch;
 /* CRT effects: F10 toggles.  4x render target for sharp-bilinear scaling
  * ("antialias"), scanline overlay, phosphor-persistence motion blur. */
 #define FX_SCALE 4
-static int          fx_on = 1;
+static int          fx_on = 0;      /* default: original look; F10 for CRT fx */
 static SDL_Texture *fx_target, *fx_scan;
 static uint8_t      fx_acc[VGA_W * VGA_H][3];   /* phosphor accumulator */
 #define FX_PERSIST 178                          /* trail decay, /256 per frame */
