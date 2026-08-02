@@ -31,13 +31,34 @@ PLIST
 
 cp build/skyroads "$OUT/Contents/MacOS/skyroads"
 
-# game data: everything the English retail flow loads
+# Game data. Filenames in the freeware distribution may be UPPERCASE
+# (DOS-style); copy case-insensitively and store as lowercase, which is
+# what the engine opens.
+copy_data() {  # $1 = filename (lowercase), $2 = "required" | "optional"
+    local src
+    src=$(find "$DATA_DIR" -maxdepth 1 -iname "$1" | head -1)
+    if [ -z "$src" ]; then
+        if [ "$2" = required ]; then
+            echo "ERROR: required data file '$1' not found in $DATA_DIR" >&2
+            echo "Point make_app.sh at your SkyRoads game data directory." >&2
+            exit 1
+        fi
+        echo "note: optional '$1' not found, skipping"
+        return
+    fi
+    cp "$src" "$OUT/Contents/Resources/$1"
+}
+
 for f in trekdat.lzs roads.lzs muzax.lzs cars.lzs dashbrd.lzs \
-         mainmenu.lzs gomenu.lzs setmenu.lzs helpmenu.lzs intro.lzs anim.lzs \
-         intro.snd sfx.snd speed.dat oxy_disp.dat ful_disp.dat demo.rec \
+         mainmenu.lzs gomenu.lzs setmenu.lzs helpmenu.lzs intro.lzs \
+         sfx.snd speed.dat oxy_disp.dat ful_disp.dat \
          world0.lzs world1.lzs world2.lzs world3.lzs world4.lzs \
          world5.lzs world6.lzs world7.lzs world8.lzs world9.lzs; do
-    cp "$DATA_DIR/$f" "$OUT/Contents/Resources/"
+    copy_data "$f" required
+done
+# not used by the port yet (intro sequence / demo mode)
+for f in anim.lzs intro.snd demo.rec; do
+    copy_data "$f" optional
 done
 
 codesign --force -s - "$OUT"

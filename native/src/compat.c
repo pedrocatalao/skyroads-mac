@@ -50,6 +50,14 @@ static FILE *open_path(const char *name, const char *mode) {
     char path[1200];
     snprintf(path, sizeof path, "%s/%s", data_dir, name);
     FILE *f = fopen(path, mode);
+    if (!f) {                           /* DOS-style UPPERCASE data files */
+        char up[1200];
+        size_t n = strlen(data_dir);
+        snprintf(up, sizeof up, "%s/%s", data_dir, name);
+        for (size_t i = n + 1; up[i]; i++)
+            if (up[i] >= 'a' && up[i] <= 'z') up[i] = (char)(up[i] - 32);
+        f = fopen(up, mode);
+    }
     if (!f) f = fopen(name, mode);      /* fall back to cwd (cfg files) */
     return f;
 }
