@@ -27,3 +27,7 @@ target_include_directories(game_sim PRIVATE src)
 
 add_executable(cars_dump src/compat.c src/assets_headless.c src/cars_dump.c)
 target_include_directories(cars_dump PRIVATE src)
+
+add_executable(export_art src/compat.c src/assets_headless.c tools/export_art.c)
+target_include_directories(export_art PRIVATE src)
+target_link_libraries(export_art PRIVATE z)
