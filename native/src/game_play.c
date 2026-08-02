@@ -870,6 +870,20 @@ static duint game_body(void)
             plat_sleep(2);
         }
 
+        if ((plat_getch() | 0x20) == 'p') {     /* P: pause/unpause */
+            for (;;) {
+                plat_osd("PAUSE");
+                if (!plat_pump()) exit(0);
+                plat_present();
+                int c = plat_getch();
+                if ((c | 0x20) == 'p')
+                    break;
+                plat_sleep(10);
+            }
+            plat_osd("");
+            gt_set(computed_time);      /* no physics catch-up on resume */
+        }
+
         if (!show_level_only)
             get_controls();
         else

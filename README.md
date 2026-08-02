@@ -65,6 +65,7 @@ cmake --build native/build --target skyroads
 | ↑ ↓ | accelerate / brake |
 | Space | jump |
 | Enter | select (menus) |
+| P | pause / unpause |
 | Esc | abort road / back |
 | F9 | music: wavetable ("AWE32") / AdLib FM |
 | F10 | CRT effects on/off (scanlines, phosphor trails, smooth scaling) |

@@ -93,3 +93,5 @@ int main(int argc, char **argv) {
 
 void sbdma(const uint8_t *buf, uint32_t len, duint smprate) { (void)buf; (void)len; (void)smprate; }
 void sbstop(void) {}
+
+void plat_osd(const char *msg) { (void)msg; }

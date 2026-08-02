@@ -213,7 +213,7 @@ int plat_pump(void) {
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
         if (e.type == SDL_QUIT) return 0;
-        if (e.type == SDL_KEYDOWN && !e.key.repeat) key_event(e.key.keysym.sym, 1);
+        if (e.type == SDL_KEYDOWN) key_event(e.key.keysym.sym, 1);
         if (e.type == SDL_KEYUP) key_event(e.key.keysym.sym, 0);
     }
     return 1;
