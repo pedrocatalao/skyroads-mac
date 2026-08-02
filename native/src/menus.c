@@ -102,6 +102,146 @@ static void help_menu(void) {                      /* intro.c:610, retail: 2 pag
     close_picture();
 }
 
+/* ---- intro sequence (intro.c:375-502), English retail ---- */
+static struct { duint frame; pic_t pic; } ani[MAX_FRAMES];
+
+static void wait_ticks_esc(duint t) {              /* delay() */
+    duint t0 = Time;
+    while ((duint)(Time - t0) < t && !Esc) clear_keybuf();
+}
+
+void sbdma(const uint8_t *buf, uint32_t len, duint smprate);
+
+duint intro(void) {
+    pic_t bkgrpic, flashpic, titpic[TITLES];
+    pal_t bkgrpal, flashpal1, flashpal2, flashpal3, anipal;
+    pal_t titpal1[TITLES], titpal2[TITLES];
+    duint frames, pics, b, lframe = (duint)-1;
+    int i, j;
+
+    start_alloc();
+    play_song(0);
+
+    open_picture("intro.lzs");
+    if (SysErr) {                       /* no intro data: skip gracefully */
+        SysErr = 0;
+        free_memory();
+        return 1;
+    }
+    load_palette_t(&bkgrpal, DEMO_ROAD_COLOR);
+    load_picture(&bkgrpic, DEMO_ROAD_COLOR);
+    load_palette_t(&flashpal1, FLASH_COLOR);
+    load_palette_t(&flashpal2, FLASH_COLOR);
+    load_picture(&flashpic, FLASH_COLOR);
+    for (i = 0; i < TITLES; i++) {
+        load_palette_t(&titpal1[i], TEXT_FADE_COLOR);
+        load_palette_t(&titpal2[i], TEXT_FADE_COLOR);
+        load_picture(&titpic[i], TEXT_FADE_COLOR);
+    }
+    close_picture();
+
+    open_picture("anim.lzs");
+    rd_word(); rd_word();
+    frames = rd_word();
+    load_palette_t(&anipal, 0);
+    for (i = pics = 0; i < (int)frames; i++) {
+        b = rd_word();
+        for (j = 0; j < (int)b && pics < MAX_FRAMES; j++) {
+            ani[pics].frame = (duint)i;
+            load_picture(&ani[pics].pic, 0);
+            pics++;
+        }
+    }
+    close_picture();
+    {                                   /* intro.snd -> Sample_Seg */
+        int h = xopenr("intro.snd");
+        xread(h, seg_ptr(Sample_Seg), SMP_LEN);
+        norm_sys_err();
+        xclose(h);
+    }
+    check_error();
+
+    Esc = 0;
+    Break = 1;
+    memset(menu_palette, 0, sizeof menu_palette);
+    fade(menu_palette, 0, 0);           /* instant black */
+    copy_to_pal(menu_palette, &anipal);
+    draw_picture(&bkgrpic);
+    fade(menu_palette, 1, FADE_TIME);
+
+    wait_ticks_esc(24);
+    if (!Esc) sbdma(seg_ptr(Sample_Seg), SMP_LEN, 90);   /* "SkyRoads!" */
+    wait_ticks_esc(64 - 18 - 9);
+
+    if (!Esc) {                         /* ship animation */
+        duint t0 = Time;
+        for (i = 0; i < (int)pics; i++) {
+            if (ani[i].frame != lframe) {
+                while ((duint)(Time - t0) < FRAME_TIME) clear_keybuf();
+                t0 = Time;
+                lframe = ani[i].frame;
+            }
+            draw_picture(&ani[i].pic);
+            clear_keybuf();
+            if (Esc) { draw_picture(&bkgrpic); break; }
+        }
+    }
+
+    Line_Len = 320;
+    Src_Seg = flashpic.seg;
+    init_mix(bkgrpic.seg, SEG_VGA, 1, 0);
+    wait_ticks_esc(36 * 2);
+
+    {                                   /* interlaced title flash wipe */
+        set_palette(&flashpal1);
+        duint t0 = Time;
+        int w;
+        do {
+            w = 319 - (int)((duint)(Time - t0)) * 319 / LOGOSPEED;
+            if (w < 0 || Esc) w = 0;
+            duint vgaptr = flashpic.addr, picptr = 0;
+            for (duint line = 0; line < flashpic.lines; line += 2) {
+                mix_line(vgaptr, picptr, (duint)w, 0);
+                mix_line(vgaptr + 320, picptr + 320 + (duint)w, 0, (duint)w);
+                vgaptr += 2 * 320;
+                picptr += flashpic.len * 2;
+            }
+            clear_keybuf();
+        } while (w);
+
+        memcpy(&flashpal3, &flashpal1, sizeof flashpal3);
+        flashpal3.seg = alloc(flashpal1.colors * 3);
+        check_error();
+        memset(seg_ptr(flashpal3.seg), 63, flashpal1.colors * 3);
+        if (!Esc) {                     /* white flash, settle to final */
+            fade_palette(&flashpal1, &flashpal3, 5);
+            wait_ticks_esc(9);
+            fade_palette(&flashpal3, &flashpal2, 70);
+        } else fade_palette(&flashpal1, &flashpal2, 5);
+    }
+
+    for (i = 2; i < TITLES && !Esc; i++) {   /* credit titles (no CD logo) */
+        set_palette(&titpal1[i]);
+        init_mix(bkgrpic.seg, SEG_VGA, 1, 0);
+        mix_picture(&titpic[i]);
+        fade_palette(&titpal1[i], &titpal2[i], 50);
+        wait_ticks_esc(50);
+        fade_palette(&titpal2[i], &titpal1[i], 50);
+        init_mix(bkgrpic.seg, SEG_VGA, 255, 0);  /* Trans_Cols=255: erase */
+        mix_picture(&titpic[i]);
+    }
+
+    i = (int)(duint)Esc;
+    Break = Esc = 0;
+    if (!i) {
+        copy_to_pal(menu_palette, &bkgrpal);
+        copy_to_pal(menu_palette, &flashpal2);
+    }
+    fade(menu_palette, 0, FADE_TIME);
+    free_memory();
+    return (duint)i;
+}
+
 duint main_menu(duint draw) {                      /* intro.c:622 */
     pic_t menu[3], bkgrpic, flashpic, fadepic;
     pal_t fadepal1, fadepal2;

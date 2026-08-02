@@ -60,6 +60,8 @@ void plat_present(void) {
     SDL_RenderClear(ren);
     SDL_RenderCopy(ren, tex, NULL, NULL);
     SDL_RenderPresent(ren);
+    void plat_debug_dump(const uint8_t *fb, const uint8_t (*pal)[3]);
+    plat_debug_dump(src, (const uint8_t (*)[3])g_palette);
 }
 
 static void toggle_fullscreen(void) {
@@ -112,6 +114,28 @@ int plat_pump(void) {
 
 unsigned plat_keys(void) { return keymask; }
 int plat_getch(void) { int c = lastch; lastch = 0; return c; }
+
+/* SKYROADS_DUMP=<dir>: write a numbered PPM of each ~second of video.
+ * Debug aid for headless runs. */
+void plat_debug_dump(const uint8_t *fb, const uint8_t (*pal)[3]) {
+    static int frame, last;
+    const char *dir = SDL_getenv("SKYROADS_DUMP");
+    if (!dir) return;
+    int now = (int)SDL_GetTicks() / 1000;
+    if (now == last) return;
+    last = now;
+    char path[1100];
+    SDL_snprintf(path, sizeof path, "%s/dump_%03d.ppm", dir, frame++);
+    FILE *f = fopen(path, "wb");
+    if (!f) return;
+    fprintf(f, "P6\n320 200\n255\n");
+    for (int i = 0; i < 320 * 200; i++) {
+        uint8_t px[3] = { (uint8_t)(pal[fb[i]][0] << 2), (uint8_t)(pal[fb[i]][1] << 2),
+                          (uint8_t)(pal[fb[i]][2] << 2) };
+        fwrite(px, 1, 3, f);
+    }
+    fclose(f);
+}
 
 const char *plat_pref_path(void) {
     static char *p;

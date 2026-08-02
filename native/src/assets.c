@@ -88,7 +88,10 @@ void load_picture(pic_t *p, duint begcol) {
     rd_mem(&hdr, sizeof hdr);
     p->addr = hdr.addr; p->lines = hdr.lines; p->len = hdr.len;
     uint32_t len = (uint32_t)p->lines * p->len;
-    p->seg = alloc(len);
+    /* +320 slack: the intro's flash wipe reads mix_line spans of up to 320px
+     * from pictures whose stride may be narrower (as the original did from
+     * adjacent DOS heap memory). */
+    p->seg = alloc(len + 320);
     check_error();
     extr_lzss(seg_ptr(p->seg), (duint)len);
     move_colors(seg_ptr(p->seg), len, begcol);

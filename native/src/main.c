@@ -8,6 +8,7 @@
 
 duint main_menu(duint draw);
 duint gomenu(void);
+duint intro(void);
 int game(int the_end);                 /* game_play.c */
 
 enum { NO_CRASH = 0, ABORT = 7 };
@@ -36,6 +37,7 @@ int main(int argc, char **argv) {
     check_error();
     initvid();
 
+    intro();                            /* Esc skips; demo mode dropped */
 mm:
     main_menu(1);
     start_alloc();
