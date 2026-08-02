@@ -62,7 +62,18 @@ void plat_present(void) {
     SDL_RenderPresent(ren);
 }
 
+static void toggle_fullscreen(void) {
+    static int fs;
+    fs = !fs;
+    SDL_SetWindowFullscreen(win, fs ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+}
+
 static void key_event(SDL_Keycode k, int down) {
+    if (down && (k == SDLK_F11 ||
+                 (k == SDLK_f && (SDL_GetModState() & KMOD_GUI)))) {
+        toggle_fullscreen();
+        return;
+    }
     unsigned bit = 0;
     switch (k) {
     case SDLK_LEFT:  bit = K_LEFT;  break;

@@ -8,30 +8,24 @@ on Apple Silicon. No emulation, no DOSBox.
 
 ## Quick start
 
-**1. Get the game data** (not included here — it's Bluemoon's freeware):
-
-Download SkyRoads from the official site, [bluemoon.ee](https://www.bluemoon.ee/history/skyroads/),
-and unzip it anywhere, e.g. `~/Downloads/skyroads-data`. Uppercase DOS-style
-filenames (`ROADS.LZS`) are fine.
-
-**2. Install the build tools** (one-time):
-
 ```bash
 brew install cmake sdl2
-```
-
-**3. Build the app** — from a clone of this repo:
-
-```bash
 git clone https://github.com/pedrocatalao/skyroads-mac.git
 cd skyroads-mac
-./native/make_app.sh ~/Downloads/skyroads-data
+./native/get_data.sh        # downloads the freeware game data from bluemoon.ee
+./native/make_app.sh data
+open native/build/SkyRoads.app
 ```
 
-**4. Play:**
+That's it. `get_data.sh` fetches the game from Bluemoon's official site (the
+game data is their freeware and is not part of this repo); `make_app.sh`
+builds a self-contained app bundle around it.
+
+Already have the game files? Skip `get_data.sh` and point `make_app.sh` at
+your folder — DOS-style uppercase filenames (`ROADS.LZS`) are fine:
 
 ```bash
-open native/build/SkyRoads.app
+./native/make_app.sh ~/Downloads/skyroads-data
 ```
 
 The app is self-contained (game data is copied into the bundle) — you can move

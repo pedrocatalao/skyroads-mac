@@ -8,3 +8,4 @@ native/build/
 .DS_Store
 *.ppm
 native/tools/unlzs
+data/

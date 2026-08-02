@@ -319,10 +319,23 @@ static duint sound_fx_playing(void)
     return (duint)(Time - sound_fx_time) < SOUND_FX_LEN;    /* AUDIO-HOOK */
 }
 
-/* TEXT-HOOK: original blits 8x8 font glyphs into VGA_SCREEN. */
+#include "font8.h"
+
+/* Original blits BIOS 8x8 font glyphs into VGA_SCREEN; we use an
+ * embedded font (see font8.h) with a 1px drop shadow for readability. */
 static void text(duint tx,duint ty,const char *s,duint col)
 {
-    (void)tx; (void)ty; (void)s; (void)col;                 /* TEXT-HOOK */
+    uint8_t *vram = vga_mem();
+    for (; *s; s++, tx += 8) {
+        const uint8_t *g = font8_glyph(*s);
+        if (!g) continue;
+        for (int r = 0; r < 8; r++)
+            for (int c = 0; c < 8; c++)
+                if (g[r] & (0x80 >> c)) {
+                    vram[(ty + r + 1) * 320 + tx + c + 1] = 0;
+                    vram[(ty + r) * 320 + tx + c] = (uint8_t)col;
+                }
+    }
 }
 
 static duint get_slab(ulong x,duint y)
