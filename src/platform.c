@@ -15,7 +15,7 @@ static int           lastch;
 static int          fx_on = 0;      /* default: original look; F10 for CRT fx */
 static SDL_Texture *fx_target, *fx_scan;
 static uint8_t      fx_acc[VGA_W * VGA_H][3];   /* phosphor accumulator */
-#define FX_PERSIST 178                          /* trail decay, /256 per frame */
+#define FX_PERSIST 214                          /* trail decay, /256 per frame */
 
 void (*plat_f9_hook)(void);
 volatile duint Time = 0;
@@ -60,6 +60,7 @@ int plat_init(const char *title, int scale) {
         SDL_UpdateTexture(fx_scan, NULL, scan, 4);
         SDL_SetTextureBlendMode(fx_scan, SDL_BLENDMODE_BLEND);
     } else fx_on = 0;                       /* no render-target support */
+    if (fx_target && SDL_getenv("SKYROADS_FX")) fx_on = 1;
     tick_origin = plat_now();
     return 0;
 }
@@ -139,7 +140,8 @@ void plat_present(void) {
     if (fxdir) {
         static int frame, last;
         int now = (int)SDL_GetTicks() / 1000;
-        if (now != last) {
+        int every = SDL_getenv("SKYROADS_DUMP_FX_ALL") != NULL;
+        if ((every && frame < 150) || (!every && now != last)) {
             last = now;
             int w, h;
             SDL_GetRendererOutputSize(ren, &w, &h);
