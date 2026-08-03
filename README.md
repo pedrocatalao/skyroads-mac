@@ -65,7 +65,7 @@ cmake --build build --target skyroads
 | Enter | select (menus) |
 | P | pause / unpause |
 | Esc | abort road / back |
-| F9 | music: wavetable ("AWE32") / AdLib FM |
+| F9 | music synth: AdLib FM (OPL2) / wavetable ("AWE32"-style, sampled instruments) |
 | F10 | CRT effects on/off (scanlines, phosphor trails, smooth scaling) |
 | Cmd-F | fullscreen |
 
@@ -78,9 +78,11 @@ cmake --build build --target skyroads
   - `assets.c`, `menus.c` — data loaders, menu flow
   - `compat.c` — DOS runtime emulation (segment memory model, LZSS
     decompressor, file I/O)
-  - `audio.c` — AdLib music driver on a software OPL2 (Nuked-OPL3, LGPL) +
-    digitized sound effects
   - `platform.c` — SDL2 window/input/timing
+  - `audio.c` — The original AdLib music driver (`adlib.asm`) ported to C:
+    drives either a software OPL2 FM
+    chip (Nuked-OPL3) or a
+    SoundFont wavetable synth (TimGM6mb) mapped to MIDI instruments; plus the SoundBlaster digitized sound effects (`sfx.snd`)
 - `docs/trek_blueprint.md` — reverse-engineering notes on the original
   renderer
 - `make_app.sh` — builds the signed `SkyRoads.app` bundle
