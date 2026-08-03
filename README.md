@@ -11,7 +11,7 @@ on Apple Silicon. No emulation, no DOSBox.
 ![status](https://img.shields.io/badge/status-playable-brightgreen)
 
 <p align="center">
-  <img src="native/screenshots/gameplay.png" width="49%" alt="In-game: the ship on road one">
+  <img src="native/screenshots/gameplay.gif" width="49%" alt="Gameplay: flying and jumping on road one">
   <img src="native/screenshots/title-crt.png" width="49%" alt="Title screen with CRT effects (F10)">
 </p>
 
