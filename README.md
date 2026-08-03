@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="native/icon.png" width="180" alt="SkyRoads app icon">
+  <img src="icon.png" width="180" alt="SkyRoads app icon">
 </p>
 
 # SkyRoads for macOS (Apple Silicon)
@@ -11,8 +11,8 @@ on Apple Silicon. No emulation, no DOSBox.
 ![status](https://img.shields.io/badge/status-playable-brightgreen)
 
 <p align="center">
-  <img src="native/screenshots/gameplay.gif" width="49%" alt="Gameplay: flying and jumping on road one">
-  <img src="native/screenshots/title-crt.png" width="49%" alt="Title screen with CRT effects (F10)">
+  <img src="screenshots/gameplay.gif" width="49%" alt="Gameplay: flying and jumping on road one">
+  <img src="screenshots/title-crt.png" width="49%" alt="Title screen with CRT effects (F10)">
 </p>
 
 ## [Download SkyRoads for macOS (Apple Silicon) here!](https://github.com/pedrocatalao/skyroads-mac/releases/download/1.1/SkyRoads.zip)
@@ -27,9 +27,9 @@ is self-contained.
 brew install cmake sdl2
 git clone https://github.com/pedrocatalao/skyroads-mac.git
 cd skyroads-mac
-./native/get_data.sh        # downloads the freeware game data from bluemoon.ee
-./native/make_app.sh data
-open native/build/SkyRoads.app
+./get_data.sh        # downloads the freeware game data from bluemoon.ee
+./make_app.sh data
+open build/SkyRoads.app
 ```
 
 That's it. `get_data.sh` fetches the game from Bluemoon's official site (the
@@ -40,7 +40,7 @@ Already have the game files? Skip `get_data.sh` and point `make_app.sh` at
 your folder — DOS-style uppercase filenames (`ROADS.LZS`) are fine:
 
 ```bash
-./native/make_app.sh ~/Downloads/skyroads-data
+./make_app.sh ~/Downloads/skyroads-data
 ```
 
 The app is self-contained (game data is copied into the bundle) — you can move
@@ -50,9 +50,9 @@ it to `/Applications`. Progress and settings are saved to
 ### Alternative: run from the terminal
 
 ```bash
-cmake -S native -B native/build
-cmake --build native/build --target skyroads
-./native/build/skyroads ~/Downloads/skyroads-data
+cmake -S . -B build
+cmake --build build --target skyroads
+./build/skyroads ~/Downloads/skyroads-data
 ```
 
 ## Controls
@@ -71,7 +71,7 @@ cmake --build native/build --target skyroads
 
 ## What's in this repo
 
-- `native/src/` — the port:
+- `src/` — the port:
   - `render.c` — C rewrite of the original 16-bit assembly 3D road renderer
   - `game_play.c` — the physics/collision/gameplay engine (bit-faithful
     fixed-point math)
@@ -81,9 +81,9 @@ cmake --build native/build --target skyroads
   - `audio.c` — AdLib music driver on a software OPL2 (Nuked-OPL3, LGPL) +
     digitized sound effects
   - `platform.c` — SDL2 window/input/timing
-- `native/docs/trek_blueprint.md` — reverse-engineering notes on the original
+- `docs/trek_blueprint.md` — reverse-engineering notes on the original
   renderer
-- `native/make_app.sh` — builds the signed `SkyRoads.app` bundle
+- `make_app.sh` — builds the signed `SkyRoads.app` bundle
 
 ## Troubleshooting
 
@@ -91,7 +91,7 @@ cmake --build native/build --target skyroads
   contain the SkyRoads data files (`trekdat.lzs`, `roads.lzs`, `world*.lzs`,
   …). Point it at the folder where you unzipped the freeware download.
 - **CMake can't find SDL2** — `brew install sdl2`, then delete
-  `native/build` and rebuild.
+  `build/` and rebuild.
 - **Intel Macs** — should build and run fine too (plain C + SDL2); only
   tested on Apple Silicon.
 
@@ -103,7 +103,7 @@ cmake --build native/build --target skyroads
   endorsed by Bluemoon; the game itself is distributed by Bluemoon as
   freeware.
 - OPL2 FM synthesis via [Nuked-OPL3](https://github.com/nukeykt/Nuked-OPL3)
-  (Nuke.YKT), LGPL-2.1 — see `native/src/opl3.c` for its license header.
+  (Nuke.YKT), LGPL-2.1 — see `src/opl3.c` for its license header.
 - Wavetable music mode via [TinySoundFont](https://github.com/schellingb/TinySoundFont)
   (MIT) playing the [TimGM6mb](https://musescore.org) SoundFont (GPL,
   Tim Brechbill), fetched by `get_data.sh` — the instrument mapping was

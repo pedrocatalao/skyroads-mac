@@ -3,7 +3,7 @@
 # official site into ./data/.  This repo never redistributes the game;
 # this downloads it from the source, on your machine, for your use.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")"
 
 URL="http://www.bluemoon.ee/history/skyroads/skyroads.zip"
 DEST="data"
@@ -26,4 +26,4 @@ if [ ! -f "$DEST/TimGM6mb.sf2" ]; then
     curl -fL --progress-bar -o "$DEST/TimGM6mb.sf2" "$SF_URL" || echo "warning: soundfont fetch failed; music will use AdLib FM"
 fi
 echo "OK: game data in ./$DEST ($(ls "$DEST" | wc -l | tr -d ' ') files)"
-echo "Next: ./native/make_app.sh $DEST"
+echo "Next: ./make_app.sh $DEST"
