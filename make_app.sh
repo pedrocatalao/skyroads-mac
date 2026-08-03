@@ -84,4 +84,7 @@ if [ -f icon.png ]; then
 fi
 
 codesign --force -s - "$OUT"
+# nudge Finder/LaunchServices so the fresh bundle's icon shows immediately
+touch "$OUT"
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$OUT" 2>/dev/null || true
 echo "built: $OUT"
