@@ -1,15 +1,41 @@
 #!/bin/bash
-# make_app.sh — package the native SkyRoads port as a macOS .app bundle.
+# make_app.sh — build SkyRoads.app.  If the game data isn't present yet, it
+# is fetched first from Bluemoon's official site (the game is their freeware;
+# this repo never redistributes it — the download happens on your machine).
+#
+# Usage: ./make_app.sh [data-dir]     (default: ./data, fetched if missing)
 set -euo pipefail
 
-# Resolve the data dir relative to where the user runs the script,
-# BEFORE changing directory.
 DATA_ARG="${1:-$(dirname "$0")/data}"
-if [ ! -d "$DATA_ARG" ]; then
-    echo "ERROR: data directory '$DATA_ARG' not found" >&2
-    echo "Usage: $0 <path-to-skyroads-game-data>   (e.g. ./make_app.sh data)" >&2
-    exit 1
+
+# ---- fetch the game data if it isn't there yet ----
+have_data() { find "$1" -maxdepth 1 -iname "roads.lzs" 2>/dev/null | grep -q .; }
+
+if ! have_data "$DATA_ARG"; then
+    if [ "$#" -ge 1 ]; then
+        echo "ERROR: no SkyRoads data in '$DATA_ARG'" >&2
+        echo "Point make_app.sh at your game data, or run it with no argument" >&2
+        echo "to download the freeware release into ./data automatically." >&2
+        exit 1
+    fi
+    URL="http://www.bluemoon.ee/history/skyroads/skyroads.zip"
+    mkdir -p "$DATA_ARG"
+    echo "Game data not found — downloading SkyRoads (freeware) from $URL ..."
+    curl -fL --progress-bar -o "$DATA_ARG/skyroads.zip" "$URL"
+    unzip -o -q "$DATA_ARG/skyroads.zip" -d "$DATA_ARG"
+    rm "$DATA_ARG/skyroads.zip"
+    have_data "$DATA_ARG" || { echo "ERROR: download did not contain the expected game data" >&2; exit 1; }
 fi
+
+# TimGM6mb SoundFont (GPL, Tim Brechbill / MuseScore) for the wavetable
+# music mode; the game falls back to AdLib FM without it.
+if ! find "$DATA_ARG" -maxdepth 1 -iname "TimGM6mb.sf2" | grep -q .; then
+    SF_URL="https://sourceforge.net/p/mscore/code/HEAD/tree/trunk/mscore/share/sound/TimGM6mb.sf2?format=raw"
+    echo "Downloading TimGM6mb.sf2 (wavetable instruments, ~6 MB) ..."
+    curl -fL --progress-bar -o "$DATA_ARG/TimGM6mb.sf2" "$SF_URL" \
+        || echo "warning: soundfont fetch failed; music will use AdLib FM"
+fi
+
 DATA_DIR="$(cd "$DATA_ARG" && pwd)"
 
 cd "$(dirname "$0")"
@@ -70,12 +96,8 @@ done
 for f in anim.lzs intro.snd demo.rec; do
     copy_data "$f" optional
 done
-# wavetable soundfont: data dir, then native/ fallback
-if ! find "$DATA_DIR" -maxdepth 1 -iname "TimGM6mb.sf2" | grep -q .; then
-    [ -f "$(dirname "$0")/TimGM6mb.sf2" ] && cp "$(dirname "$0")/TimGM6mb.sf2" "$OUT/Contents/Resources/"
-else
-    copy_data "TimGM6mb.sf2" optional
-fi
+# wavetable soundfont
+copy_data "TimGM6mb.sf2" optional
 
 # app icon
 if [ -f icon.png ]; then

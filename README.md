@@ -27,17 +27,16 @@ is self-contained.
 brew install cmake sdl2
 git clone https://github.com/pedrocatalao/skyroads-mac.git
 cd skyroads-mac
-./get_data.sh        # downloads the freeware game data from bluemoon.ee
-./make_app.sh data
+./make_app.sh        # fetches the freeware game data, then builds the app
 open build/SkyRoads.app
 ```
 
-That's it. `get_data.sh` fetches the game from Bluemoon's official site (the
-game data is their freeware and is not part of this repo); `make_app.sh`
-builds a self-contained app bundle around it.
+That's it. If the game data isn't in `./data` yet, `make_app.sh` downloads
+it from Bluemoon's official site (the game is their freeware and is not part
+of this repo), then builds a self-contained app bundle around it.
 
-Already have the game files? Skip `get_data.sh` and point `make_app.sh` at
-your folder — DOS-style uppercase filenames (`ROADS.LZS`) are fine:
+Already have the game files? Point `make_app.sh` at your folder —
+DOS-style uppercase filenames (`ROADS.LZS`) are fine:
 
 ```bash
 ./make_app.sh ~/Downloads/skyroads-data
@@ -108,5 +107,5 @@ cmake --build build --target skyroads
   (Nuke.YKT), LGPL-2.1 — see `src/opl3.c` for its license header.
 - Wavetable music mode via [TinySoundFont](https://github.com/schellingb/TinySoundFont)
   (MIT) playing the [TimGM6mb](https://musescore.org) SoundFont (GPL,
-  Tim Brechbill), fetched by `get_data.sh` — the instrument mapping was
+  Tim Brechbill), fetched by `make_app.sh` — the instrument mapping was
   reconstructed from the original Sound Club song sources.
