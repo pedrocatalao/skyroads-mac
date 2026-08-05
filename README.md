@@ -2,11 +2,11 @@
   <img src="icon.png" width="180" alt="SkyRoads app icon">
 </p>
 
-# SkyRoads for macOS (Apple Silicon)
+# SkyRoads for macOS
 
 A native macOS port of **SkyRoads** (Bluemoon Interactive, 1993) — the classic
 DOS space-racing game — rewritten in portable C with SDL2 and running natively
-on Apple Silicon. No emulation, no DOSBox.
+on macOS. No emulation, no DOSBox.
 
 ![status](https://img.shields.io/badge/status-playable-brightgreen)
 
