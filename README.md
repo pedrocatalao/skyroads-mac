@@ -15,7 +15,7 @@ on both Apple Silicon and Intel Macs (universal binary). No emulation, no DOSBox
   <img src="screenshots/title-crt.png" width="49%" alt="Title screen with CRT effects (F10)">
 </p>
 
-## [Download SkyRoads for macOS here!](https://github.com/pedrocatalao/skyroads-mac/releases/download/1.2/SkyRoads.zip)
+## [Download SkyRoads for macOS here!](https://github.com/pedrocatalao/skyroads-mac/releases/latest/download/SkyRoads.zip)
 
 Unzip, move `SkyRoads.app` anywhere you like, and **right-click → Open** the
 first time (the app isn't notarized, so macOS asks once). That's it — the app
