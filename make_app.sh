@@ -41,8 +41,26 @@ DATA_DIR="$(cd "$DATA_ARG" && pwd)"
 cd "$(dirname "$0")"
 OUT="build/SkyRoads.app"
 
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release >/dev/null
-cmake --build build --target skyroads -j >/dev/null
+# ---- official universal SDL2.framework (arm64 + x86_64), cached ----
+SDL2_VER="2.32.10"
+FW="build/vendor/SDL2.framework"
+if [ ! -d "$FW" ]; then
+    echo "Downloading SDL2 $SDL2_VER framework (universal, ~2 MB) ..."
+    mkdir -p build/vendor
+    curl -fL --progress-bar -o build/vendor/SDL2.dmg \
+        "https://github.com/libsdl-org/SDL/releases/download/release-$SDL2_VER/SDL2-$SDL2_VER.dmg"
+    MNT=$(mktemp -d)
+    hdiutil attach build/vendor/SDL2.dmg -nobrowse -quiet -mountpoint "$MNT"
+    cp -R "$MNT/SDL2.framework" build/vendor/
+    hdiutil detach "$MNT" -quiet
+    rm build/vendor/SDL2.dmg
+fi
+
+# universal (arm64 + x86_64) release build against the framework
+cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release \
+      -DSKY_SDL2_FRAMEWORK="$PWD/$FW" \
+      -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" >/dev/null
+cmake --build build/release --target skyroads -j >/dev/null
 
 rm -rf "$OUT"
 mkdir -p "$OUT/Contents/MacOS" "$OUT/Contents/Resources"
@@ -65,7 +83,13 @@ cat > "$OUT/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-cp build/skyroads "$OUT/Contents/MacOS/skyroads"
+cp build/release/skyroads "$OUT/Contents/MacOS/skyroads"
+
+# embed SDL2.framework (headers stripped) so the app is fully self-contained
+mkdir -p "$OUT/Contents/Frameworks"
+cp -R "$FW" "$OUT/Contents/Frameworks/"
+rm -rf "$OUT/Contents/Frameworks/SDL2.framework/Headers" \
+       "$OUT/Contents/Frameworks/SDL2.framework/Versions/A/Headers"
 
 # Game data. Filenames in the freeware distribution may be UPPERCASE
 # (DOS-style); copy case-insensitively and store as lowercase, which is
@@ -105,6 +129,7 @@ if [ -f icon.png ]; then
         && echo "icon: from icon.png" || echo "note: icon generation failed, skipping"
 fi
 
+codesign --force -s - "$OUT/Contents/Frameworks/SDL2.framework"
 codesign --force -s - "$OUT"
 # nudge Finder/LaunchServices so the fresh bundle's icon shows immediately
 touch "$OUT"

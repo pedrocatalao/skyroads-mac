@@ -4,7 +4,24 @@ project(skyroads C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wno-unused-parameter -O2")
 
-find_package(SDL2 REQUIRED CONFIG)
+# SKY_SDL2_FRAMEWORK=<path to SDL2.framework>: link the official (universal)
+# SDL2.framework and reference it at @executable_path/../Frameworks — used by
+# make_app.sh for the self-contained release bundle.  Default: Homebrew SDL2,
+# best for development builds.
+set(SKY_SDL2_FRAMEWORK "" CACHE PATH "Path to SDL2.framework for bundled release builds")
+
+if(SKY_SDL2_FRAMEWORK)
+    add_library(sky_sdl2 INTERFACE)
+    target_include_directories(sky_sdl2 INTERFACE "${SKY_SDL2_FRAMEWORK}/Headers")
+    get_filename_component(_sdl2_fw_dir "${SKY_SDL2_FRAMEWORK}" DIRECTORY)
+    target_compile_options(sky_sdl2 INTERFACE "-F${_sdl2_fw_dir}")
+    target_link_options(sky_sdl2 INTERFACE
+        "-F${_sdl2_fw_dir}" "-framework" "SDL2"
+        "-Wl,-rpath,@executable_path/../Frameworks")
+    add_library(SDL2::SDL2 ALIAS sky_sdl2)
+else()
+    find_package(SDL2 REQUIRED CONFIG)
+endif()
 
 set(CORE_SRC
     src/compat.c

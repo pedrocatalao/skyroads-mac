@@ -2,11 +2,11 @@
   <img src="icon.png" width="180" alt="SkyRoads app icon">
 </p>
 
-# SkyRoads for macOS (Apple Silicon)
+# SkyRoads for macOS
 
 A native macOS port of **SkyRoads** (Bluemoon Interactive, 1993) — the classic
 DOS space-racing game — rewritten in portable C with SDL2 and running natively
-on Apple Silicon. No emulation, no DOSBox.
+on both Apple Silicon and Intel Macs (universal binary). No emulation, no DOSBox.
 
 ![status](https://img.shields.io/badge/status-playable-brightgreen)
 
@@ -15,7 +15,7 @@ on Apple Silicon. No emulation, no DOSBox.
   <img src="screenshots/title-crt.png" width="49%" alt="Title screen with CRT effects (F10)">
 </p>
 
-## [Download SkyRoads for macOS (Apple Silicon) here!](https://github.com/pedrocatalao/skyroads-mac/releases/download/1.1/SkyRoads.zip)
+## [Download SkyRoads for macOS here!](https://github.com/pedrocatalao/skyroads-mac/releases/download/1.1/SkyRoads.zip)
 
 Unzip, move `SkyRoads.app` anywhere you like, and **right-click → Open** the
 first time (the app isn't notarized, so macOS asks once). That's it — the app
@@ -93,8 +93,8 @@ cmake --build build --target skyroads
   …). Point it at the folder where you unzipped the freeware download.
 - **CMake can't find SDL2** — `brew install sdl2`, then delete
   `build/` and rebuild.
-- **Intel Macs** — should build and run fine too (plain C + SDL2); only
-  tested on Apple Silicon.
+- **Intel Macs** — the app is a universal binary and runs natively on
+  Intel too (x86_64 slice verified under Rosetta).
 
 ## Credits & legal
 
